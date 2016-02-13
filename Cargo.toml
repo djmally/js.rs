@@ -15,12 +15,12 @@ git = "https://github.com/rustoscript/js.rs-common.git"
 rev = "3e8c1b0"
 
 [dependencies.french_press]
-git = "https://github.com/saghm/french-press"
-rev = "fbf7edc"
+git = "file:/home/saghm/code/jsrs/french-press"
+branch = "scope-tree"
 
 [dependencies.js-types]
 git = "https://github.com/rustoscript/js-types.git"
-rev = "3419872"
+branch = "scope-tree"
 
 [dependencies]
 rustyline = "0.2.0"

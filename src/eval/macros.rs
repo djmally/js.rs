@@ -4,12 +4,11 @@ macro_rules! eval_float_post_op {
         if let Var(ref binding) = **$e {
             match $state.load(&Binding::new(binding.clone())) {
                 Ok((orig_var, _)) => {
-                        let $f: f64 = orig_var.as_number();
-                        let new_num: f64 = $new;
-                        let mut new_var = JsVar::new(JsNum(new_num));
+                        let $f = orig_var.as_number();
+                        let mut new_var = JsVar::new(JsNum($new));
                         new_var.binding = Binding::new(binding.clone());
                         $state.alloc(new_var, None).unwrap();
-                        orig_var
+                        (orig_var, None)
                 }
                 _ => panic!(format!("ReferenceError: {} is not defined", binding))
             }
@@ -24,12 +23,11 @@ macro_rules! eval_float_pre_op {
         if let Var(ref binding) = **$e {
             match $state.load(&Binding::new(binding.clone())) {
                 Ok((orig_var, _)) => {
-                        let $f: f64 = orig_var.as_number();
-                        let new_num: f64 = $new;
-                        let mut new_var = JsVar::new(JsNum(new_num));
+                        let $f = orig_var.as_number();
+                        let mut new_var = JsVar::new(JsNum($new));
                         new_var.binding = Binding::new(binding.clone());
                         $state.alloc(new_var.clone(), None).unwrap();
-                        new_var
+                        (new_var, None)
                 }
                 _ => panic!(format!("ReferenceError: {} is not defined", binding))
             }
