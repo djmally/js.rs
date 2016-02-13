@@ -15,7 +15,7 @@ git = "https://github.com/rustoscript/js.rs-common.git"
 rev = "3e8c1b0"
 
 [dependencies.french_press]
-git = "file:/home/saghm/code/jsrs/french-press"
+git = "https://github.com/saghm/french-press"
 branch = "scope-tree"
 
 [dependencies.js-types]

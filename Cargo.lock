@@ -2,7 +2,7 @@
 name = "jsrs"
 version = "0.1.0"
 dependencies = [
- "french_press 0.1.0 (git+file:///home/saghm/code/jsrs/french-press?branch=scope-tree)",
+ "french_press 0.1.0 (git+https://github.com/saghm/french-press?branch=scope-tree)",
  "js-types 0.1.0 (git+https://github.com/rustoscript/js-types.git?branch=scope-tree)",
  "jsrs-common 0.1.0 (git+https://github.com/rustoscript/js.rs-common.git?rev=3e8c1b0)",
  "jsrs-parser 0.1.0 (git+https://github.com/rustoscript/js.rs-parser.git?rev=d875cd2)",
@@ -55,7 +55,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "french_press"
 version = "0.1.0"
-source = "git+file:///home/saghm/code/jsrs/french-press?branch=scope-tree#6e26fc1dbf9d7b0be358bf2c154cd4fec28a760b"
+source = "git+https://github.com/saghm/french-press?branch=scope-tree#6e26fc1dbf9d7b0be358bf2c154cd4fec28a760b"
 dependencies = [
  "clippy 0.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-types 0.1.0 (git+https://github.com/rustoscript/js-types.git?branch=scope-tree)",
