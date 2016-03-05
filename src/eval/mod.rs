@@ -18,6 +18,7 @@ use jsrs_common::ast::Exp::*;
 use jsrs_common::ast::BinOp::*;
 use jsrs_common::ast::Stmt::*;
 
+use std::borrow::Borrow;
 use unescape::unescape;
 
 type VarWithPtr = (JsVar, Option<JsPtrEnum>);
@@ -152,6 +153,17 @@ pub fn eval_exp(e: &Exp, mut state: &mut ScopeManager) -> (JsVar, Option<JsPtrEn
 
         // fun_name([arg_exp1, arg_exps])
         &Call(ref fun_name, ref arg_exps) => {
+            if let Var(ref s) = **fun_name {
+                if "console_log" == s {
+                    if let Some(&ref e) = arg_exps.get(0) {
+                        if let &Str(ref s) = e.borrow() {
+                            println!("{}", unescape(s).expect("Invalid string literal"));
+                            return scalar(JsUndef);
+                        }
+                    }
+                }
+            }
+
             let fun_binding = eval_exp(fun_name, state).0;
 
             // Create vector of arguments, evaluated to JsVars.
