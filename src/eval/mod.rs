@@ -21,7 +21,6 @@ use jsrs_common::ast::Stmt::*;
 use std::borrow::Borrow;
 use unescape::unescape;
 
-type VarWithPtr = (JsVar, Option<JsPtrEnum>);
 
 // Helper to avoid repeating this everywhere
 fn scalar(v: JsType) -> (JsVar, Option<JsPtrEnum>) {
@@ -30,7 +29,8 @@ fn scalar(v: JsType) -> (JsVar, Option<JsPtrEnum>) {
 
 /// Evaluate a string containing some JavaScript statements (or sequences of statements).
 /// Returns a JsVar which is the return value of those statements.
-pub fn eval_string(string: &str, state: &mut ScopeManager) -> JsVar {
+pub fn eval_string(string: &str, state: &mut ScopeManager) -> (JsVar, Option<JsPtrEnum>) {
+    println!("{}", string);
     match parse_Stmt(string) {
         Ok(stmt) => {
             eval_stmt(&stmt, state).0
@@ -42,7 +42,7 @@ pub fn eval_string(string: &str, state: &mut ScopeManager) -> JsVar {
 /// Evaluate a single JS statement (which may be a block or sequence of statements).
 /// Returns tuple of (evaluated final value, return value), where return value requires that
 /// `return` be used to generate it.
-pub fn eval_stmt(s: &Stmt, mut state: &mut ScopeManager) -> (JsVar, Option<JsVar>) {
+pub fn eval_stmt(s: &Stmt, mut state: &mut ScopeManager) -> ((JsVar, Option<JsPtrEnum>), Option<JsVar>) {
     match *s {
         // var_string = exp;
         Assign(ref var_string, ref exp) => {
@@ -51,23 +51,23 @@ pub fn eval_stmt(s: &Stmt, mut state: &mut ScopeManager) -> (JsVar, Option<JsVar
 
             // Clone the js_var to store into the ScopeManager
             let cloned = js_var.clone();
-            match state.alloc(cloned, js_ptr) {
+            match state.alloc(cloned, js_ptr.clone()) {
                 Ok(_) => (),
                 e @ Err(_) => println!("{:?}", e),
             }
 
-            (js_var, None)
+            ((js_var, js_ptr), None)
         },
 
         // exp;
-        BareExp(ref exp) => (eval_exp(exp, &mut state).0, None),
+        BareExp(ref exp) => (eval_exp(exp, &mut state), None),
 
         // var var_string = exp
         Decl(ref var_string, ref exp) => {
             let (mut js_var, js_ptr) = eval_exp(exp, state);
             js_var.binding = Binding::new(var_string.clone());
-            match state.alloc(js_var.clone(), js_ptr) {
-                Ok(_) => (js_var, None),
+            match state.alloc(js_var.clone(), js_ptr.clone()) {
+                Ok(_) => ((js_var, js_ptr), None),
                 e @ Err(_) => panic!("{:?}", e),
             }
         },
@@ -84,15 +84,15 @@ pub fn eval_stmt(s: &Stmt, mut state: &mut ScopeManager) -> (JsVar, Option<JsVar
                 if let Some(ref block) = *else_block {
                     eval_stmt(&*block, state)
                 } else {
-                    (JsVar::new(JsUndef), None)
+                    (scalar(JsUndef), None)
                 }
             }
         },
 
         // return exp
         Ret(ref exp) => {
-            let js_var = eval_exp(&exp, &mut state).0;
-            (js_var.clone(), Some(js_var))
+            let js_var = eval_exp(&exp, &mut state);
+            (js_var.clone(), Some(js_var.0))
         }
 
         // a sequence of any two expressions
@@ -117,7 +117,7 @@ pub fn eval_stmt(s: &Stmt, mut state: &mut ScopeManager) -> (JsVar, Option<JsVar
                     ret_val = v;
                 } else {
                     // condition is no longer true, return a return value
-                    return (JsVar::new(JsUndef), ret_val);
+                    return (scalar(JsUndef), ret_val);
                 }
             }
         }
@@ -164,7 +164,7 @@ pub fn eval_exp(e: &Exp, mut state: &mut ScopeManager) -> (JsVar, Option<JsPtrEn
                 }
             }
 
-            let fun_binding = eval_exp(fun_name, state).0;
+            let (fun_binding, fun_ptr) = eval_exp(fun_name, state);
 
             // Create vector of arguments, evaluated to JsVars.
             let mut args = Vec::new();
@@ -172,33 +172,37 @@ pub fn eval_exp(e: &Exp, mut state: &mut ScopeManager) -> (JsVar, Option<JsPtrEn
                 args.push(eval_exp(exp, state));
             }
 
-            match state.load(&fun_binding.binding) {
-                Ok((_, Some(JsPtrEnum::JsFn(js_fn_struct)))) => {
-                    state.push_scope(e);
-
-                    for param in js_fn_struct.params {
-                        let mut arg = if args.is_empty() {
-                            scalar(JsUndef)
-                        } else {
-                            args.remove(0)
-                        };
-
-                        arg.0.binding = Binding::new(param.to_owned());
-                        state.alloc(arg.0, arg.1)
-                            .expect("Unable to store function argument in scope");
-                    }
-
-                    let (_, v) = eval_stmt(&js_fn_struct.stmt, state);
-
-                    // Should we yield here? Not sure, so for now it doesn't
-                    state.pop_scope(false).expect("Unable to clear scope for function");
-                    // TODO handle obj
-                    v.map(|x| (x, None)).unwrap_or(scalar(JsUndef))
+            let js_fn_struct = match fun_ptr {
+                Some(JsPtrEnum::JsFn(fun)) => fun,
+                Some(_) => panic!("ReferenceError: {:?} is not a function", fun_name),
+                None => match state.load(&fun_binding.binding) {
+                    Ok((_, Some(JsPtrEnum::JsFn(fun)))) => fun,
+                    Ok(_) => panic!("ReferenceError: {:?} is not a function", fun_name),
+                    Err(_) => panic!("ReferenceError: {:?} is not defined", fun_name),
                 }
-                Ok(_) => panic!("Invalid call object"),
-                _ => panic!("ReferenceError: {:?} is not defined", fun_name)
+            };
+
+            state.push_scope(e);
+
+            for param in js_fn_struct.params {
+                let mut arg = if args.is_empty() {
+                    scalar(JsUndef)
+                } else {
+                    args.remove(0)
+                };
+
+                arg.0.binding = Binding::new(param.to_owned());
+                state.alloc(arg.0, arg.1)
+                .expect("Unable to store function argument in scope");
             }
-        },
+
+            let (_, v) = eval_stmt(&js_fn_struct.stmt, state);
+
+            // Should we yield here? Not sure, so for now it doesn't
+            state.pop_scope(false).expect("Unable to clear scope for function");
+            // TODO handle obj
+            v.map(|x| (x, None)).unwrap_or(scalar(JsUndef))
+        }
 
         // function([param1, params]) { body }
         // function opt_binding([param1, params]) { body }
