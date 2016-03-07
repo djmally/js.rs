@@ -1,7 +1,7 @@
 #[macro_use]
 mod macros;
 
-use coerce::{AsBool,AsNumber};
+use coerce::{AsBool, AsNumber, AsString};
 
 use french_press::ScopeManager;
 use french_press::alloc::AllocBox;
@@ -18,7 +18,6 @@ use jsrs_common::ast::Exp::*;
 use jsrs_common::ast::BinOp::*;
 use jsrs_common::ast::Stmt::*;
 
-use std::borrow::Borrow;
 use unescape::unescape;
 
 
@@ -30,7 +29,6 @@ fn scalar(v: JsType) -> (JsVar, Option<JsPtrEnum>) {
 /// Evaluate a string containing some JavaScript statements (or sequences of statements).
 /// Returns a JsVar which is the return value of those statements.
 pub fn eval_string(string: &str, state: &mut ScopeManager) -> (JsVar, Option<JsPtrEnum>) {
-    println!("{}", string);
     match parse_Stmt(string) {
         Ok(stmt) => {
             eval_stmt(&stmt, state).0
@@ -156,10 +154,9 @@ pub fn eval_exp(e: &Exp, mut state: &mut ScopeManager) -> (JsVar, Option<JsPtrEn
             if let Var(ref s) = **fun_name {
                 if "console_log" == s {
                     if let Some(&ref e) = arg_exps.get(0) {
-                        if let &Str(ref s) = e.borrow() {
-                            println!("{}", unescape(s).expect("Invalid string literal"));
-                            return scalar(JsUndef);
-                        }
+                        let (v, p) = eval_exp(e, state);
+                        println!("# {}", v.as_string(p.as_ref()));
+                        return scalar(JsUndef);
                     }
                 }
             }
